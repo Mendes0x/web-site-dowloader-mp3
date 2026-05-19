@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Media Downloader</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="app-shell">
+    <section class="workspace" aria-labelledby="pageTitle">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Download center</p>
+          <h1 id="pageTitle">Media Downloader</h1>
+        </div>
+
+        <button id="themeToggleBtn" type="button" class="icon-button" aria-label="Toggle theme">
+          <span data-lucide="sun"></span>
+        </button>
+      </header>
+
+      <form id="downloadForm" class="download-panel" autocomplete="off">
+        <div class="field-group field-full">
+          <label for="url">Source link</label>
+          <div class="input-shell">
+            <span class="field-icon" data-lucide="link-2"></span>
+            <input id="url" type="url" placeholder="https://youtube.com/..." required />
+          </div>
+        </div>
+
+        <div class="form-grid">
+          <div class="field-group">
+            <label for="type">Format</label>
+            <div class="select-shell">
+              <span class="field-icon" data-lucide="file-music"></span>
+              <select id="type">
+                <option value="audio">MP3 audio</option>
+                <option value="video">Video</option>
+              </select>
+              <span class="chevron" data-lucide="chevron-down"></span>
+            </div>
+          </div>
+
+          <div class="field-group">
+            <label for="folder">Folder</label>
+            <div class="input-shell">
+              <span class="field-icon" data-lucide="folder"></span>
+              <input id="folder" type="text" placeholder="downloads/music" />
+            </div>
+          </div>
+        </div>
+
+        <button id="downloadBtn" class="primary-action" type="submit">
+          <span data-lucide="download"></span>
+          <span>Download now</span>
+        </button>
+
+        <div class="status" id="status" role="status">
+          <span class="status-dot"></span>
+          <span>Ready to start.</span>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script>
+    const urlInput = document.getElementById('url');
+    const typeSelect = document.getElementById('type');
+    const folderInput = document.getElementById('folder');
+    const statusEl = document.getElementById('status');
+    const button = document.getElementById('downloadBtn');
+    const themeToggleBtn = document.getElementById('themeToggleBtn');
+    const form = document.getElementById('downloadForm');
+
+    const renderIcons = () => {
+      if (window.lucide) {
+        window.lucide.createIcons({ attrs: { 'stroke-width': 1.8 } });
+      }
+    };
+
+    const setTheme = theme => {
+      document.documentElement.classList.toggle('light', theme === 'light');
+      document.body.classList.toggle('light', theme === 'light');
+      themeToggleBtn.innerHTML = `<span data-lucide="${theme === 'light' ? 'moon' : 'sun'}"></span>`;
+      themeToggleBtn.setAttribute('aria-label', theme === 'light' ? 'Enable dark theme' : 'Enable light theme');
+      localStorage.setItem('theme', theme);
+      renderIcons();
+    };
+
+    const savedTheme = localStorage.getItem('theme');
+    setTheme(savedTheme === 'light' ? 'light' : 'dark');
+
+    themeToggleBtn.addEventListener('click', () => {
+      const nextTheme = document.body.classList.contains('light') ? 'dark' : 'light';
+      setTheme(nextTheme);
+    });
+
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+
+      const url = urlInput.value.trim();
+      const type = typeSelect.value;
+      const folder = folderInput.value.trim();
+
+      if (!url) {
+        statusEl.innerHTML = '<span class="status-dot"></span><span>Enter a valid link before downloading.</span>';
+        statusEl.classList.add('error');
+        return;
+      }
+
+      statusEl.innerHTML = '<span class="status-dot"></span><span>Starting download...</span>';
+      statusEl.classList.remove('success', 'error');
+      button.disabled = true;
+
+      try {
+        const response = await fetch('/download', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url, type, folder })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          statusEl.innerHTML = `<span class="status-dot"></span><span>Error: ${data.error || 'Server failure.'}</span>`;
+          statusEl.classList.add('error');
+          console.error(data.details || data);
+        } else {
+          statusEl.innerHTML = `<span class="status-dot"></span><span>${data.message}</span>`;
+          statusEl.classList.add('success');
+        }
+      } catch (error) {
+        statusEl.innerHTML = '<span class="status-dot"></span><span>Could not connect to the local server.</span>';
+        statusEl.classList.add('error');
+        console.error(error);
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+    renderIcons();
+  </script>
+</body>
+</html>

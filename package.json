@@ -1,0 +1,15 @@
+{
+  "name": "web-site-dowloader-mp3",
+  "version": "1.0.0",
+  "description": "Local server with a web interface for downloading video or audio from a link.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "author": "web-site-dowloader-mp3",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.4",
+    "youtube-dl-exec": "^1.1.0"
+  }
+}
