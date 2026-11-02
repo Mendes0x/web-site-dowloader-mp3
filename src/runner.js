@@ -1,6 +1,6 @@
 'use strict';
 
-const youtubeDl = require('youtube-dl-exec');
+const { spawn } = require('node:child_process');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 
@@ -13,26 +13,37 @@ function flagsFor(job) {
       : quality === 'balanced'
         ? 'bv*[height<=1080]+ba/b[height<=1080]/best'
         : 'bv*+ba/best';
-
   return {
     format,
     output: path.join(job.dir, '%(title).110B-%(id)s.%(ext)s'),
     noPlaylist: true,
-    maxDownloads: 1,
-    maxFilesize: '500M',
-    noWarnings: true,
-    noMtime: true,
-    newline: true,
-    retries: 2,
-    fragmentRetries: 2,
-    socketTimeout: 20,
-    progress: true,
-    progressTemplate: 'download:MD_PROGRESS:%(progress._percent_str)s',
-    restrictFilenames: true,
-    ...job.format === 'audio'
-      ? { extractAudio: true, audioFormat: 'mp3', audioQuality: quality === 'best' ? '0' : quality === 'small' ? '8' : '4' }
-      : { mergeOutputFormat: 'mp4' }
+    extractAudio: job.format === 'audio',
+    audioFormat: job.format === 'audio' ? 'mp3' : undefined,
+    audioQuality: quality === 'best' ? '0' : quality === 'small' ? '8' : '4',
+    mergeOutputFormat: job.format === 'video' ? 'mp4' : undefined,
+    progressTemplate: 'download:MD_PROGRESS:%(progress._percent_str)s'
   };
+}
+
+function buildArgs(job) {
+  const flags = flagsFor(job);
+  const args = [
+    '--ignore-config', '--no-playlist', '--max-downloads', '1',
+    '--max-filesize', '500M', '--no-mtime', '--newline', '--no-warnings',
+    '--retries', '2', '--fragment-retries', '2', '--socket-timeout', '20',
+    '--restrict-filenames',
+    '--progress-template', flags.progressTemplate,
+    '--output', flags.output,
+    '--format', flags.format
+  ];
+  if (flags.extractAudio) {
+    args.push('--extract-audio', '--audio-format', 'mp3', '--audio-quality', flags.audioQuality);
+  } else {
+    args.push('--merge-output-format', 'mp4');
+  }
+  // Explicit -- keeps the URL a positional argument and prevents option injection.
+  args.push('--', job.url);
+  return args;
 }
 
 function parseProgress(text) {
@@ -42,68 +53,96 @@ function parseProgress(text) {
 
 async function listArtifacts(dir) {
   const entries = await fs.readdir(dir, { withFileTypes: true });
-  const allowed = new Set(['.mp3', '.mp4', '.m4a', '.mkv', '.webm', '.opus', '.ogg', '.flac', '.wav']);
+  const formats = new Set(['.mp3', '.mp4', '.m4a', '.mkv', '.webm', '.opus', '.ogg', '.flac', '.wav']);
   const files = [];
   for (const entry of entries) {
     if (!entry.isFile() || entry.isSymbolicLink()) continue;
-    if (!allowed.has(path.extname(entry.name).toLowerCase())) continue;
-    const full = path.join(dir, entry.name);
-    const stat = await fs.lstat(full);
+    if (!formats.has(path.extname(entry.name).toLowerCase())) continue;
+    const stat = await fs.lstat(path.join(dir, entry.name));
     if (!stat.isFile() || stat.isSymbolicLink()) continue;
     files.push({ id: String(files.length), name: entry.name, size: stat.size });
   }
   return files;
 }
 
-function createRunner({ exec = youtubeDl.exec, timeoutMs = 20 * 60 * 1000 } = {}) {
+function createRunner({
+  spawnProcess = spawn,
+  executable = process.env.YTDLP_BIN || 'yt-dlp',
+  timeoutMs = 20 * 60 * 1000
+} = {}) {
   return async (job, { signal, progress }) => {
     await fs.mkdir(job.dir, { recursive: false, mode: 0o700 });
-    if (signal.aborted) throw Object.assign(new Error('Cancelled'), { publicMessage: 'Job cancelled.' });
+    if (signal.aborted) throw new Error('Cancelled');
 
-    let subprocess;
+    const args = buildArgs(job);
+    let child;
     try {
-      subprocess = exec(job.url, flagsFor(job), { windowsHide: true });
+      child = spawnProcess(executable, args, {
+        cwd: job.dir,
+        shell: false,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        windowsHide: true
+      });
     } catch {
-      throw Object.assign(new Error('Launch failed'), { publicMessage: 'Could not start yt-dlp. Run npm install again.' });
+      throw Object.assign(new Error('Could not launch yt-dlp'), {
+        publicMessage: 'Could not start yt-dlp. Install it and ensure it is on PATH.'
+      });
     }
 
     let outputTail = '';
-    const readOutput = chunk => {
-      const text = outputTail + chunk.toString('utf8');
-      const matched = parseProgress(text);
-      if (matched !== null) progress(matched, 'Downloading');
-      if (text.includes('[ExtractAudio]') || text.includes('[Merger]') || text.includes('[VideoRemuxer]')) {
+    const update = chunk => {
+      const output = outputTail + String(chunk);
+      const fraction = parseProgress(output);
+      if (fraction !== null) progress(fraction, 'Downloading');
+      if (output.includes('[ExtractAudio]') || output.includes('[Merger]') || output.includes('[VideoRemuxer]')) {
         progress(99, 'Processing media');
       }
-      outputTail = text.slice(-256);
+      outputTail = output.slice(-256);
     };
-    subprocess.stdout?.on('data', readOutput);
-    subprocess.stderr?.on('data', readOutput);
+    child.stdout?.on('data', update);
+    child.stderr?.on('data', update);
 
-    const abort = () => subprocess.kill('SIGTERM');
-    signal.addEventListener('abort', abort, { once: true });
-    const timer = setTimeout(() => subprocess.kill('SIGTERM'), timeoutMs);
+    const stop = () => child.kill('SIGTERM');
+    signal.addEventListener('abort', stop, { once: true });
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      stop();
+    }, timeoutMs);
     timer.unref?.();
 
     try {
-      await subprocess;
+      await new Promise((resolve, reject) => {
+        child.once('error', reject);
+        child.once('close', (code, sig) => {
+          if (code === 0) resolve();
+          else reject(new Error('yt-dlp exited: ' + (sig || code)));
+        });
+      });
       if (signal.aborted) throw new Error('Cancelled');
+      if (timedOut) throw new Error('Timed out');
       const files = await listArtifacts(job.dir);
       if (!files.length) {
-        throw Object.assign(new Error('No resulting files'), { publicMessage: 'No output media file was produced.' });
+        throw Object.assign(new Error('No files'), { publicMessage: 'Download completed but no playable output file was found.' });
       }
       return files;
     } catch (error) {
       if (signal.aborted) throw error;
+      if (timedOut) {
+        throw Object.assign(new Error('Timeout'), { publicMessage: 'Download timed out. Try a smaller quality preset.' });
+      }
+      if (error?.code === 'ENOENT') {
+        throw Object.assign(new Error('yt-dlp not found'), { publicMessage: 'yt-dlp is not installed or not on PATH.' });
+      }
       if (error.publicMessage) throw error;
-      throw Object.assign(new Error('yt-dlp failed'), {
-        publicMessage: 'Download failed. Verify that the media is accessible and FFmpeg is installed.'
+      throw Object.assign(new Error('Download worker failed'), {
+        publicMessage: 'Download failed. Check source availability, yt-dlp and FFmpeg installation.'
       });
     } finally {
       clearTimeout(timer);
-      signal.removeEventListener('abort', abort);
+      signal.removeEventListener('abort', stop);
     }
   };
 }
 
-module.exports = { createRunner, flagsFor, parseProgress, listArtifacts };
+module.exports = { createRunner, flagsFor, buildArgs, parseProgress, listArtifacts };
