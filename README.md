@@ -12,7 +12,7 @@
 - **Background jobs** with queueing (2 simultaneous workers, 20 pending jobs), status, cancellation, and history.
 - **Live events** via Server-Sent Events, with a periodic synchronization fallback.
 - **File library** for finished MP3/video output and removal of old jobs.
-- **yt-dlp + FFmpeg** integration with quality presets, retry and timeout settings.
+- **Modern yt-dlp CLI + FFmpeg** integration with quality presets, retry and timeout settings; no obsolete youtube-dl wrapper.
 - **Safer local server:** loopback binding, host and origin protections, request validation, fixed job directories, HTTPS platform allowlist, no disabled TLS verification.
 - **Automated test suite** using Node's built-in test runner, with GitHub Actions on pull requests and pushes.
 
@@ -24,7 +24,7 @@
 - FFmpeg and FFprobe on PATH for audio conversion and video merging
 - Internet connectivity for permitted media sources
 
-The existing \`youtube-dl-exec\` dependency ordinarily installs yt-dlp during \`npm install\`. If blocked, check its upstream documentation.
+Install the standalone yt-dlp executable separately and ensure \`yt-dlp --version\` works in your terminal. MediaDock intentionally invokes the system yt-dlp without a shell instead of shipping an old youtube-dl wrapper.
 
 ## Quick start
 
@@ -32,6 +32,9 @@ The existing \`youtube-dl-exec\` dependency ordinarily installs yt-dlp during \`
 git clone https://github.com/renegadothedev/web-site-dowloader-mp3.git
 cd web-site-dowloader-mp3
 npm ci
+# Install the latest yt-dlp and FFmpeg separately, then verify them:
+yt-dlp --version
+ffmpeg -version
 npm start
 \`\`\`
 
@@ -40,6 +43,7 @@ Open **http://127.0.0.1:3000**.
 \`\`\`bash
 npm run dev    # restart on changes
 npm run check  # JS syntax checks + tests
+npm run doctor # Dependency diagnostics
 npm test       # tests only
 \`\`\`
 

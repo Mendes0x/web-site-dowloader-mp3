@@ -21,3 +21,40 @@ test('artifact list filters symlinks and unfinished files',async t=>{
  const files=await listArtifacts(dir);
  assert.equal(files.length,1);assert.equal(files[0].name,'example.mp3');
 });
+
+test('CLI arguments use positional delimiter and safe defaults',()=>{
+ const {buildArgs}=require('../src/runner');
+ const job={dir:'/tmp/md',url:'https://youtube.com/watch?v=test',format:'video',quality:'balanced'};
+ const args=buildArgs(job);
+ assert.ok(args.includes('--ignore-config'));
+ assert.ok(args.includes('--no-playlist'));
+ assert.equal(args.at(-2),'--');
+ assert.equal(args.at(-1),job.url);
+ assert.equal(args.includes('--no-check-certificates'),false);
+});
+test('mock subprocess reports progress and makes an artifact',async t=>{
+ const {createRunner}=require('../src/runner');
+ const {EventEmitter}=require('node:events');
+ const {PassThrough}=require('node:stream');
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'mediadock-mock-'));
+ const jobDir=path.join(dir,'job');
+ t.after(()=>fs.rm(dir,{recursive:true,force:true}));
+ const fakeSpawn=()=>{
+   const child=new EventEmitter();
+   child.stdout=new PassThrough();child.stderr=new PassThrough();
+   child.kill=()=>{child.emit('close',null,'SIGTERM');return true;};
+   setImmediate(async()=>{
+     await fs.writeFile(path.join(jobDir,'audio.mp3'),'output');
+     child.stdout.write('MD_PROGRESS: 54.5%\n');
+     child.emit('close',0,null);
+   });
+   return child;
+ };
+ let percentage=0;
+ const runner=createRunner({spawnProcess:fakeSpawn,executable:'yt-dlp'});
+ const files=await runner({dir:jobDir,url:'https://youtube.com/watch?v=x',format:'audio',quality:'best'},{
+   signal:new AbortController().signal,progress:percent=>{percentage=percent;}
+ });
+ assert.equal(percentage,54.5);
+ assert.equal(files[0].name,'audio.mp3');
+});
