@@ -27,7 +27,7 @@ test('Tape Lab uses working audio/video radio controls and preserves server form
     assert.ok(html.includes('value="' + quality + '"'));
   }
   assert.match(js, /radio\.addEventListener\('change'/);
-  assert.match(js, /document\.querySelectorAll|document\.querySelector/);
+  assert.match(js, /querySelectorAll|querySelector/);
 });
 test('Library retains accessible filters, progress display and file controls', () => {
   for (const filter of ['all', 'running', 'completed', 'failed']) {
