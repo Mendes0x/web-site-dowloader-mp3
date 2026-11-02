@@ -1,25 +1,34 @@
 'use strict';
 
-const form = document.getElementById('download-form');
-const feedback = document.getElementById('feedback');
-const list = document.getElementById('job-list');
-const template = document.getElementById('job-template');
+/**
+ * MediaDock Tape Lab UI.
+ * Client state is derived from the local server; no media URL is injected as HTML.
+ */
+const $ = (selector, root = document) => root.querySelector(selector);
+const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
+const form = $('#download-form');
+const feedback = $('#feedback');
+const library = $('#job-list');
+const template = $('#job-template');
 const jobs = new Map();
 let activeFilter = 'all';
-let eventStream = null;
+let searchTerm = '';
+let eventStream;
 
-const formatDate = stamp => {
-  try { return new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(stamp)); }
+const shortId = id => String(id).slice(0, 8).toUpperCase();
+const formatBytes = bytes => Number(bytes) >= 1048576
+  ? (Number(bytes) / 1048576).toFixed(1) + ' MB'
+  : (Number(bytes) / 1024).toFixed(1) + ' KB';
+const formatDate = date => {
+  try { return new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(date)); }
   catch { return ''; }
 };
-const shortId = id => id.slice(0, 8).toUpperCase();
-const formatBytes = bytes => bytes > 1048576 ? (bytes / 1048576).toFixed(1) + ' MB' : (bytes / 1024).toFixed(1) + ' KB';
-const el = (tag, className, text) => {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text !== undefined) node.textContent = text;
-  return node;
-};
+function node(tag, className, content) {
+  const element = document.createElement(tag);
+  if (className) element.className = className;
+  if (content !== undefined) element.textContent = String(content);
+  return element;
+}
 function setFeedback(message, error = false) {
   feedback.textContent = message;
   feedback.classList.toggle('error', error);
@@ -32,157 +41,229 @@ async function request(url, options = {}) {
   const response = await fetch(url, { ...options, headers, cache: 'no-store' });
   if (response.status === 204) return null;
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error || 'The server could not complete this request.');
+  if (!response.ok) throw new Error(data.error || 'The local server could not complete this request.');
   return data;
 }
 function matches(job) {
-  if (activeFilter === 'all') return true;
-  if (activeFilter === 'running') return job.state === 'running' || job.state === 'queued';
-  if (activeFilter === 'failed') return job.state === 'failed' || job.state === 'cancelled';
-  return job.state === activeFilter;
+  const isState = activeFilter === 'all'
+    || (activeFilter === 'running' && ['running', 'queued'].includes(job.state))
+    || (activeFilter === 'failed' && ['failed', 'cancelled'].includes(job.state))
+    || job.state === activeFilter;
+  if (!isState) return false;
+  if (!searchTerm) return true;
+  const haystack = [
+    job.id, job.url, job.format, job.quality, job.state, job.stage,
+    ...(job.files || []).map(file => file.name)
+  ].join(' ').toLowerCase();
+  return haystack.includes(searchTerm);
 }
-function stat() {
-  const items = [...jobs.values()];
-  document.getElementById('stat-total').textContent = String(items.length);
-  document.getElementById('stat-active').textContent = String(items.filter(j => j.state === 'running').length);
-  document.getElementById('stat-completed').textContent = String(items.filter(j => j.state === 'completed').length);
-  document.getElementById('stat-queued').textContent = String(items.filter(j => j.state === 'queued').length);
+function updateStats() {
+  const entries = [...jobs.values()];
+  $('#stat-total').textContent = String(entries.length);
+  $('#stat-active').textContent = String(entries.filter(job => job.state === 'running').length);
+  $('#stat-completed').textContent = String(entries.filter(job => job.state === 'completed').length);
+  $('#stat-queued').textContent = String(entries.filter(job => job.state === 'queued').length);
 }
 function renderJob(job) {
   const fragment = template.content.cloneNode(true);
-  const row = fragment.querySelector('.job-row');
-  row.dataset.jobId = job.id;
-  const title = (() => {
-    try { const address = new URL(job.url); return address.hostname.replace(/^www\./, '') + address.pathname; }
-    catch { return 'Media download'; }
-  })();
-  row.querySelector('.job-icon').textContent = job.format === 'audio' ? '♫' : '▷';
-  row.querySelector('.job-id').textContent = '#' + shortId(job.id);
-  row.querySelector('.job-date').textContent = formatDate(job.createdAt);
-  row.querySelector('.job-title').textContent = title.length > 90 ? title.slice(0, 87) + '…' : title;
-  row.querySelector('.job-format').textContent = job.format.toUpperCase() + ' · ' + job.quality;
-  row.querySelector('.job-stage').textContent = job.stage || job.state;
-  row.querySelector('.job-state').textContent = job.state;
-  row.querySelector('.job-state').dataset.state = job.state;
-  row.querySelector('.progress-fill').style.width = String(job.progress) + '%';
-  row.querySelector('.job-percent').textContent = String(job.progress) + '%';
-  row.querySelector('.job-error').textContent = job.error || '';
-  const cancel = row.querySelector('.job-cancel');
-  const remove = row.querySelector('.job-remove');
-  cancel.hidden = job.state !== 'queued' && job.state !== 'running';
-  remove.hidden = job.state === 'queued' || job.state === 'running';
-  cancel.addEventListener('click', () => action(job.id, 'cancel'));
-  remove.addEventListener('click', () => action(job.id, 'remove'));
-  const files = row.querySelector('.job-files');
+  const card = $('.job-row', fragment);
+  card.dataset.jobId = job.id;
+  let title = 'Media download';
+  try {
+    const url = new URL(job.url);
+    title = url.hostname.replace(/^www\./, '') + decodeURI(url.pathname);
+  } catch { /* A missing or malformed URL is rendered as generic text. */ }
+
+  $('.job-icon', card).textContent = job.format === 'audio' ? '♫' : '▷';
+  $('.job-id', card).textContent = 'TAPE #' + shortId(job.id);
+  $('.job-date', card).textContent = formatDate(job.createdAt);
+  $('.job-title', card).textContent = title.length > 105 ? title.slice(0, 102) + '…' : title;
+  $('.job-format', card).textContent = String(job.format || '').toUpperCase() + ' / ' + String(job.quality || '');
+  $('.job-stage', card).textContent = job.stage || job.state;
+  $('.job-state', card).textContent = job.state;
+  $('.job-state', card).dataset.state = job.state;
+  const progress = Math.max(0, Math.min(100, Number(job.progress) || 0));
+  $('.progress-fill', card).style.width = progress + '%';
+  $('.progress-track', card).setAttribute('aria-valuenow', String(progress));
+  $('.job-percent', card).textContent = progress + '%';
+  $('.job-error', card).textContent = job.error || '';
+
+  const cancel = $('.job-cancel', card);
+  const remove = $('.job-remove', card);
+  cancel.hidden = !['queued', 'running'].includes(job.state);
+  remove.hidden = !['completed', 'failed', 'cancelled'].includes(job.state);
+  cancel.addEventListener('click', () => jobAction(job.id, 'cancel', cancel));
+  remove.addEventListener('click', () => jobAction(job.id, 'remove', remove));
+  cancel.setAttribute('aria-label', 'Cancel job ' + shortId(job.id));
+  remove.setAttribute('aria-label', 'Delete job ' + shortId(job.id) + ' and its files');
+
+  const downloads = $('.job-files', card);
   for (const file of job.files || []) {
-    const a = el('a', null, '↓ ' + file.name + ' (' + formatBytes(file.size) + ')');
-    a.href = '/api/jobs/' + encodeURIComponent(job.id) + '/files/' + encodeURIComponent(file.id);
-    a.download = file.name;
-    files.append(a);
+    const link = node('a', 'file-link', '↓ GET FILE · ' + file.name + ' (' + formatBytes(file.size) + ')');
+    link.href = '/api/jobs/' + encodeURIComponent(job.id) + '/files/' + encodeURIComponent(file.id);
+    link.download = file.name;
+    downloads.append(link);
   }
-  return row;
+  return card;
+}
+function emptyState() {
+  const empty = node('div', 'empty-state');
+  empty.append(
+    node('span', 'empty-art', '✳'),
+    node('h3', null, activeFilter === 'all' && !searchTerm ? 'Your collection starts here.' : 'No tapes found.'),
+    node('p', null, activeFilter === 'all' && !searchTerm
+      ? 'Paste your first authorized media link above to fill your shelf.'
+      : 'Try a different search or change the library filter.')
+  );
+  if (activeFilter === 'all' && !searchTerm) {
+    const link = node('a', null, "LET'S GO ↗");
+    link.href = '#download-deck';
+    empty.append(link);
+  }
+  return empty;
 }
 function render() {
-  const selected = [...jobs.values()]
+  const entries = [...jobs.values()]
     .filter(matches)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const fragment = document.createDocumentFragment();
-  if (!selected.length) {
-    const empty = el('div', 'empty-state');
-    empty.append(el('div', 'empty-icon', '↓'), el('h3', null, activeFilter === 'all' ? 'Nothing here yet.' : 'No matching jobs.'),
-      el('p', null, activeFilter === 'all' ? 'Start a download above and it will appear here.' : 'Try another status filter.'));
-    fragment.append(empty);
-  } else {
-    selected.forEach(job => fragment.append(renderJob(job)));
-  }
-  list.replaceChildren(fragment);
-  stat();
+  if (!entries.length) fragment.append(emptyState());
+  else entries.forEach(job => fragment.append(renderJob(job)));
+  library.replaceChildren(fragment);
+  updateStats();
 }
 async function refresh() {
-  const data = await request('/api/jobs');
+  const { jobs: latest } = await request('/api/jobs');
   jobs.clear();
-  data.jobs.forEach(job => jobs.set(job.id, job));
+  latest.forEach(job => jobs.set(job.id, job));
   render();
 }
-async function action(id, operation) {
+async function jobAction(id, command, button) {
+  button.disabled = true;
   try {
-    if (operation === 'cancel') {
-      const data = await request('/api/jobs/' + encodeURIComponent(id) + '/cancel', { method: 'POST' });
-      jobs.set(id, data.job);
+    if (command === 'cancel') {
+      const { job } = await request('/api/jobs/' + encodeURIComponent(id) + '/cancel', { method: 'POST' });
+      jobs.set(id, job);
+      setFeedback('Job stopped. The worker may need a moment to shut down.');
     } else {
       await request('/api/jobs/' + encodeURIComponent(id), { method: 'DELETE' });
       jobs.delete(id);
+      setFeedback('Tape removed from your local library.');
     }
     render();
-    setFeedback(operation === 'cancel' ? 'Job cancelled.' : 'Job and associated files removed.');
-  } catch (error) { setFeedback(error.message, true); }
-}
-form.addEventListener('submit', async event => {
-  event.preventDefault();
-  const button = document.getElementById('submit-button');
-  const input = {
-    url: document.getElementById('media-url').value.trim(),
-    format: document.getElementById('format').value,
-    quality: document.getElementById('quality').value
-  };
-  button.disabled = true;
-  setFeedback('Adding the job to your local queue…');
-  try {
-    const data = await request('/api/jobs', { method: 'POST', body: JSON.stringify(input) });
-    jobs.set(data.job.id, data.job);
-    activeFilter = 'all';
-    document.querySelectorAll('[data-state]').forEach(btn => {
-      if (!btn.classList.contains('job-state')) {
-        const yes = btn.dataset.state === activeFilter;
-        btn.classList.toggle('active', yes);
-        btn.setAttribute('aria-pressed', String(yes));
-      }
-    });
-    render();
-    setFeedback('Job added. Live updates will appear in your library.');
-    form.reset();
   } catch (error) {
+    button.disabled = false;
     setFeedback(error.message, true);
-  } finally { button.disabled = false; }
-});
-document.querySelectorAll('.job-filter').forEach(button => button.addEventListener('click', () => {
-  activeFilter = button.dataset.state;
-  document.querySelectorAll('.job-filter').forEach(filter => {
-    const pressed = filter === button;
-    filter.classList.toggle('active', pressed);
-    filter.setAttribute('aria-pressed', String(pressed));
+  }
+}
+function setFilter(value) {
+  activeFilter = value;
+  $$('.job-filter').forEach(button => {
+    const active = button.dataset.state === value;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-pressed', String(active));
   });
   render();
-}));
-document.getElementById('refresh-button').addEventListener('click', () => {
-  refresh().then(() => setFeedback('Library refreshed.')).catch(error => setFeedback(error.message, true));
+}
+
+$$('input[name="format-choice"]').forEach(radio => {
+  radio.addEventListener('change', () => {
+    if (radio.checked) $('#format').value = radio.value;
+  });
+});
+form.addEventListener('submit', async event => {
+  event.preventDefault();
+  const button = $('#submit-button');
+  const selected = $('input[name="format-choice"]:checked');
+  const requestData = {
+    url: $('#media-url').value.trim(),
+    format: selected?.value || $('#format').value,
+    quality: $('#quality').value
+  };
+  button.disabled = true;
+  setFeedback('Putting your request on the deck…');
+  try {
+    const { job } = await request('/api/jobs', {
+      method: 'POST',
+      body: JSON.stringify(requestData)
+    });
+    jobs.set(job.id, job);
+    setFilter('all');
+    searchTerm = '';
+    $('#job-search').value = '';
+    setFeedback('Your tape is in the queue! Follow its progress below.');
+    form.reset();
+    $('#format').value = 'audio';
+    $('#media-url').focus();
+  } catch (error) {
+    setFeedback(error.message, true);
+  } finally {
+    button.disabled = false;
+  }
+});
+
+$('#paste-button').addEventListener('click', async () => {
+  try {
+    const copied = await navigator.clipboard.readText();
+    if (!copied.trim()) {
+      setFeedback('Your clipboard is empty.', true);
+      return;
+    }
+    $('#media-url').value = copied.trim();
+    $('#media-url').focus();
+    setFeedback('Link pasted. Choose your format and go!');
+  } catch {
+    $('#media-url').focus();
+    setFeedback('Clipboard access is unavailable. Paste a link into the field manually.');
+  }
+});
+
+$$('.job-filter').forEach(button => {
+  button.addEventListener('click', () => setFilter(button.dataset.state));
+});
+$('#job-search').addEventListener('input', event => {
+  searchTerm = event.target.value.trim().toLowerCase();
+  render();
+});
+$('#refresh-button').addEventListener('click', () => {
+  refresh().then(() => setFeedback('Shelf updated.'))
+    .catch(error => setFeedback(error.message, true));
 });
 function connectEvents() {
   if (!('EventSource' in window)) return;
   eventStream = new EventSource('/api/events');
   eventStream.addEventListener('job', event => {
-    try { const job = JSON.parse(event.data); jobs.set(job.id, job); render(); }
-    catch { /* Ignore malformed events. */ }
+    try {
+      const job = JSON.parse(event.data);
+      jobs.set(job.id, job);
+      render();
+    } catch { /* Ignore malformed updates. */ }
   });
   eventStream.addEventListener('removed', event => {
-    try { jobs.delete(JSON.parse(event.data).id); render(); } catch {}
+    try { jobs.delete(JSON.parse(event.data).id); render(); }
+    catch { /* Ignore malformed updates. */ }
   });
 }
-const themeButton = document.getElementById('theme-toggle');
-function applyTheme(theme) {
-  document.documentElement.dataset.theme = theme;
-  themeButton.textContent = theme === 'light' ? '☀' : '☾';
-  themeButton.setAttribute('aria-label', theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme');
+function theme(value) {
+  document.documentElement.dataset.theme = value;
+  $('#theme-toggle').textContent = value === 'light' ? '☾' : '☀';
+  $('#theme-toggle').setAttribute('aria-label', value === 'light' ? 'Switch to night theme' : 'Switch to day theme');
+  const meta = $('meta[name="theme-color"]');
+  if (meta) meta.content = value === 'light' ? '#f6f3eb' : '#152338';
 }
-const storedTheme = localStorage.getItem('mediadock-theme');
-applyTheme(storedTheme === 'light' ? 'light' : 'dark');
-themeButton.addEventListener('click', () => {
-  const theme = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
-  applyTheme(theme);
-  localStorage.setItem('mediadock-theme', theme);
+const preferenceKey = 'mediadock-tape-theme';
+let saved = 'light';
+try { saved = localStorage.getItem(preferenceKey) === 'dark' ? 'dark' : 'light'; } catch {}
+theme(saved);
+$('#theme-toggle').addEventListener('click', () => {
+  const next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
+  theme(next);
+  try { localStorage.setItem(preferenceKey, next); } catch {}
 });
-document.getElementById('year').textContent = String(new Date().getFullYear());
-refresh().then(connectEvents).catch(error => setFeedback('Local server error: ' + error.message, true));
-// Occasional resync covers tab sleep or lost SSE messages.
-setInterval(() => { if (!document.hidden) refresh().catch(() => {}); }, 30_000);
+$('#year').textContent = String(new Date().getFullYear());
+refresh().then(connectEvents)
+  .catch(error => setFeedback('The local server is unavailable: ' + error.message, true));
+setInterval(() => {
+  if (!document.hidden) refresh().catch(() => {});
+}, 30_000);
 window.addEventListener('pagehide', () => eventStream?.close());
