@@ -1,6 +1,6 @@
 # MediaDock
 
-**A private, local-first media download studio.** MediaDock transforms the original single-endpoint downloader into a responsive Node.js application with a bounded queue, live progress, controls, and a file library.
+**A private, local-first media download studio with a completely original Tape Lab interface.** MediaDock transforms the original single-endpoint downloader into a responsive Node.js application with a bounded queue, live progress, controls, and a file library.
 
 ![Node.js](https://img.shields.io/badge/Node.js-20%2B-339933?logo=node.js&logoColor=white) ![CI](https://github.com/renegadothedev/web-site-dowloader-mp3/actions/workflows/ci.yml/badge.svg) ![MIT](https://img.shields.io/badge/License-MIT-cb455f)
 
@@ -8,7 +8,8 @@
 
 ## Highlights
 
-- **Modern interface** with responsive dark/light theme, accessible controls and an activity dashboard.
+- **Tape Lab experience:** vibrant cobalt-and-yellow 90s-inspired hardware aesthetic, an original animated CSS cassette illustration, tape-card download library, tactile controls, and an optional night theme.
+- **Faster workflow:** click-to-paste link input, audio/video radio selection, library search and keyboard-accessible controls.
 - **Background jobs** with queueing (2 simultaneous workers, 20 pending jobs), status, cancellation, and history.
 - **Live events** via Server-Sent Events, with a periodic synchronization fallback.
 - **File library** for finished MP3/video output and removal of old jobs.
@@ -70,9 +71,9 @@ server.js                Express API, loopback policies, event stream, file down
 src/validation.js        Request validation and allowed hostnames
 src/queue.js             Job states, limits, cancellation, events
 src/runner.js            yt-dlp worker and output discovery
-public/index.html        Accessible UI
-public/style.css         Responsive dark/light styles
-public/app.js            Browser state, events and actions
+public/index.html        Original Tape Lab application layout
+public/style.css         Retro hardware artwork, bright/night themes and responsive UI
+public/app.js            Library filters/search, paste, theming, SSE and actions
 tests/                   Unit + local API integration tests
 .github/workflows/ci.yml Node 20/22 CI
 downloads/               Generated media (ignored by Git)
@@ -118,3 +119,9 @@ curl -X POST http://127.0.0.1:3000/api/jobs \
 See [SECURITY.md](SECURITY.md), [CONTRIBUTING.md](CONTRIBUTING.md) and [LICENSE](LICENSE).
 
 Built by [renegadothedev](https://github.com/renegadothedev).
+
+## Tape Lab design
+
+This app intentionally **does not share the gothic editorial identity of the maintainer's portfolio**. It looks like an expressive retro-futurist media appliance instead: warm cream paper, bright cobalt, citrus yellow, orange stickers, thick outlines, cassette reels and playful tactile controls. Every visual element is original HTML/CSS/SVG; there are no borrowed product photos or third-party design assets. The interface defaults to the colorful day theme, with an optional night shift saved locally in the browser. All application functionality remains local-first.
+
+The UI is a working interface to the existing REST API. The tape illustration is decorative and does not represent live audio playback. Audio files are downloaded for permitted offline use; MediaDock does not include a media player.
