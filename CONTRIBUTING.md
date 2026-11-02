@@ -5,7 +5,7 @@ Contributions are welcome. Prefer useful changes with clear rationale over activ
 1. Open an issue or describe the bug.
 2. Create a feature branch.
 3. Make a focused change and add offline tests.
-4. Run \`npm ci\`, \`npm run check\` and confirm the UI on mobile.
+4. Run `npm ci`, `npm run check` and confirm the UI on mobile.
 5. Open a pull request with test results and screenshots where appropriate.
 6. Respond to review feedback.
 

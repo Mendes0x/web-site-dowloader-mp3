@@ -24,11 +24,11 @@
 - FFmpeg and FFprobe on PATH for audio conversion and video merging
 - Internet connectivity for permitted media sources
 
-Install the standalone yt-dlp executable separately and ensure \`yt-dlp --version\` works in your terminal. MediaDock intentionally invokes the system yt-dlp without a shell instead of shipping an old youtube-dl wrapper.
+Install the standalone yt-dlp executable separately and ensure `yt-dlp --version` works in your terminal. MediaDock intentionally invokes the system yt-dlp without a shell instead of shipping an old youtube-dl wrapper.
 
 ## Quick start
 
-\`\`\`bash
+```bash
 git clone https://github.com/renegadothedev/web-site-dowloader-mp3.git
 cd web-site-dowloader-mp3
 npm ci
@@ -36,16 +36,16 @@ npm ci
 yt-dlp --version
 ffmpeg -version
 npm start
-\`\`\`
+```
 
 Open **http://127.0.0.1:3000**.
 
-\`\`\`bash
+```bash
 npm run dev    # restart on changes
 npm run check  # JS syntax checks + tests
 npm run doctor # Dependency diagnostics
 npm test       # tests only
-\`\`\`
+```
 
 The server intentionally binds to **127.0.0.1**. Do not expose it to the Internet via a reverse proxy, port forwarding, Docker host mapping, or a cloud deployment: it has no user authentication.
 
@@ -61,11 +61,11 @@ YouTube, Vimeo, SoundCloud, Bandcamp, Dailymotion, and TikTok HTTPS links are al
 4. Download completed files through the library.
 5. Cancel pending/running jobs or delete old completed entries.
 
-Files are stored in private subdirectories under \`downloads/<job-id>/\`, not arbitrary paths supplied by browser clients. Jobs are held in memory; on restart the job list resets, while previously downloaded files remain on disk until deleted manually. Cancelling an active subprocess may take a moment.
+Files are stored in private subdirectories under `downloads/<job-id>/`, not arbitrary paths supplied by browser clients. Jobs are held in memory; on restart the job list resets, while previously downloaded files remain on disk until deleted manually. Cancelling an active subprocess may take a moment.
 
 ## Architecture
 
-\`\`\`text
+```text
 server.js                Express API, loopback policies, event stream, file downloads
 src/validation.js        Request validation and allowed hostnames
 src/queue.js             Job states, limits, cancellation, events
@@ -76,33 +76,33 @@ public/app.js            Browser state, events and actions
 tests/                   Unit + local API integration tests
 .github/workflows/ci.yml Node 20/22 CI
 downloads/               Generated media (ignored by Git)
-\`\`\`
+```
 
-Job state transitions: \`queued → running → completed\`, or \`queued/running → cancelled\`; failed attempts become \`failed\`.
+Job state transitions: `queued → running → completed`, or `queued/running → cancelled`; failed attempts become `failed`.
 
 ## API
 
 | Method | Endpoint | Purpose |
 | --- | --- | --- |
-| GET | \`/api/health\` | Service status |
-| GET | \`/api/jobs\` | All current jobs and counts |
-| POST | \`/api/jobs\` | Queue a download |
-| GET | \`/api/jobs/:id\` | Individual status |
-| POST | \`/api/jobs/:id/cancel\` | Cancel |
-| DELETE | \`/api/jobs/:id\` | Delete a terminal job and its files |
-| GET | \`/api/jobs/:id/files/:fileId\` | Fetch an output artifact |
-| GET | \`/api/events\` | Live SSE: \`job\` and \`removed\` |
+| GET | `/api/health` | Service status |
+| GET | `/api/jobs` | All current jobs and counts |
+| POST | `/api/jobs` | Queue a download |
+| GET | `/api/jobs/:id` | Individual status |
+| POST | `/api/jobs/:id/cancel` | Cancel |
+| DELETE | `/api/jobs/:id` | Delete a terminal job and its files |
+| GET | `/api/jobs/:id/files/:fileId` | Fetch an output artifact |
+| GET | `/api/events` | Live SSE: `job` and `removed` |
 
-Mutation endpoints require the request header \`X-MediaDock-Request: 1\`, and enforce same-origin rules.
+Mutation endpoints require the request header `X-MediaDock-Request: 1`, and enforce same-origin rules.
 
 Example:
 
-\`\`\`bash
+```bash
 curl -X POST http://127.0.0.1:3000/api/jobs \
   -H 'Content-Type: application/json' \
   -H 'X-MediaDock-Request: 1' \
   -d '{"url":"https://www.youtube.com/watch?v=YOUR_ALLOWED_VIDEO","format":"audio","quality":"balanced"}'
-\`\`\`
+```
 
 ## Security & caveats
 
