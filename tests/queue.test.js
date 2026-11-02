@@ -30,3 +30,28 @@ test('record caps enforce bounded memory',()=>{
  const q=new DownloadQueue({root:'/tmp/mediadock-tests',maxJobs:1,runner:async()=>new Promise(()=>{})});
  q.submit(input);assert.throws(()=>q.submit(input),/Too many saved jobs/);q.stop();
 });
+
+test('completed jobs are never silently evicted while files remain',async()=>{
+ const q=new DownloadQueue({root:'/tmp/mediadock-tests',maxJobs:1,runner:async()=>[]});
+ const first=q.submit(input);
+ await wait(15);
+ assert.equal(q.get(first.id).state,'completed');
+ assert.throws(()=>q.submit(input),/Too many saved jobs/);
+ await q.remove(first.id);
+ const second=q.submit(input);
+ assert.notEqual(first.id,second.id);
+ await wait(15);
+});
+test('a cancelled worker must finish stopping before deletion',async()=>{
+ const q=new DownloadQueue({
+   root:'/tmp/mediadock-tests',
+   runner:async()=>{await wait(42);return [];}
+ });
+ const job=q.submit(input);
+ await wait(8);
+ q.cancel(job.id);
+ await assert.rejects(q.remove(job.id),/worker is still stopping/i);
+ await wait(62);
+ await q.remove(job.id);
+ assert.equal(q.get(job.id),null);
+});
