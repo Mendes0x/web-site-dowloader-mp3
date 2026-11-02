@@ -1,149 +1,106 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Media Downloader</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0d0a10">
+  <meta name="description" content="MediaDock — your private, local-first media download studio.">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+  <title>MediaDock — Local Media Studio</title>
 </head>
 <body>
-  <main class="app-shell">
-    <section class="workspace" aria-labelledby="pageTitle">
-      <header class="topbar">
-        <div>
-          <p class="eyebrow">Download center</p>
-          <h1 id="pageTitle">Media Downloader</h1>
-        </div>
+  <a href="#main" class="skip-link">Skip to main content</a>
+  <div class="shell">
+    <aside class="sidebar" aria-label="App navigation">
+      <div class="brand">
+        <div class="brand-symbol" aria-hidden="true">◈</div>
+        <div class="brand-name">media<span>dock.</span><small>LOCAL MEDIA STUDIO</small></div>
+      </div>
+      <nav class="side-nav" aria-label="Sections">
+        <a class="active" href="#studio"><span aria-hidden="true">◉</span> Studio <span class="nav-key">01</span></a>
+        <a href="#library"><span aria-hidden="true">▤</span> Library <span class="nav-key">02</span></a>
+        <a href="#about"><span aria-hidden="true">ⓘ</span> About <span class="nav-key">03</span></a>
+      </nav>
+      <div class="sidebar-spacer"></div>
+      <div class="sidebar-card">
+        <div class="sidebar-card-tag"><i class="pulse" aria-hidden="true"></i> PRIVATE WORKSPACE</div>
+        <p>No cloud account. No tracking. Your files stay on this computer.</p>
+      </div>
+      <div class="sidebar-foot"><span>v2.0.0 / BUILD IN THE DARK</span><a href="https://github.com/renegadothedev/web-site-dowloader-mp3" target="_blank" rel="noopener noreferrer" aria-label="View source code on GitHub">SOURCE ↗</a></div>
+    </aside>
 
-        <button id="themeToggleBtn" type="button" class="icon-button" aria-label="Toggle theme">
-          <span data-lucide="sun"></span>
-        </button>
+    <div class="main-column">
+      <header class="topbar">
+        <div class="breadcrumb">WORKSPACE <span>/</span> <strong>STUDIO</strong></div>
+        <div class="topbar-right"><span class="local-indicator"><i class="pulse" aria-hidden="true"></i> LOCAL SERVER</span><button type="button" id="theme-toggle" class="theme-toggle" aria-label="Toggle color theme">☾</button></div>
       </header>
 
-      <form id="downloadForm" class="download-panel" autocomplete="off">
-        <div class="field-group field-full">
-          <label for="url">Source link</label>
-          <div class="input-shell">
-            <span class="field-icon" data-lucide="link-2"></span>
-            <input id="url" type="url" placeholder="https://youtube.com/..." required />
+      <main id="main">
+        <section class="hero" id="studio" aria-labelledby="hero-title">
+          <div class="hero-copy">
+            <div class="eyebrow"><span class="eyebrow-rule"></span> YOUR CREATIVE WORKFLOW, SIMPLIFIED</div>
+            <h1 id="hero-title">Your media.<br><em>Your space.</em></h1>
+            <p>A private download workspace for the videos and audio you're allowed to save. Add a link, choose the output, and leave the rest to MediaDock.</p>
+            <div class="hero-meta"><span>NO ACCOUNT REQUIRED</span><span class="meta-star">✳</span><span>LOCAL-FIRST</span><span class="meta-star">✳</span><span>OPEN SOURCE</span></div>
           </div>
-        </div>
+          <div class="hero-art" aria-hidden="true">
+            <div class="art-grid"></div><div class="art-ring art-ring-1"></div><div class="art-ring art-ring-2"></div><div class="art-ring art-ring-3"></div><div class="art-core"><span>▶</span></div>
+            <div class="art-label art-label-top">MEDIA / 001</div><div class="art-label art-label-bottom">ACQUIRE · PROCESS · SAVE</div>
+          </div>
+        </section>
 
-        <div class="form-grid">
-          <div class="field-group">
-            <label for="type">Format</label>
-            <div class="select-shell">
-              <span class="field-icon" data-lucide="file-music"></span>
-              <select id="type">
-                <option value="audio">MP3 audio</option>
-                <option value="video">Video</option>
-              </select>
-              <span class="chevron" data-lucide="chevron-down"></span>
+        <section class="studio-layout" aria-label="New download and activity">
+          <div class="panel create-panel">
+            <div class="panel-heading"><div><span class="eyebrow">01 / CREATE A JOB</span><h2>New download</h2></div><span class="panel-asterisk" aria-hidden="true">✳</span></div>
+            <form id="download-form" autocomplete="off">
+              <div class="form-field">
+                <label for="media-url">MEDIA URL <span class="required">*</span></label>
+                <input id="media-url" name="url" type="url" required maxlength="2048" placeholder="https://www.youtube.com/watch?v=..." spellcheck="false" autocomplete="off">
+                <p class="field-hint">Supported: YouTube, Vimeo, SoundCloud, Bandcamp, Dailymotion and TikTok.</p>
+              </div>
+              <div class="form-row">
+                <div class="form-field"><label for="format">OUTPUT FORMAT</label><select id="format" name="format"><option value="audio">MP3 · Audio</option><option value="video">MP4 · Video</option></select></div>
+                <div class="form-field"><label for="quality">QUALITY PROFILE</label><select id="quality" name="quality"><option value="best">Best available</option><option value="balanced" selected>Balanced</option><option value="small">Smaller file</option></select></div>
+              </div>
+              <div class="settings-note"><span aria-hidden="true">⌁</span><span>Jobs run on your computer. Up to two downloads can run simultaneously; additional jobs wait in a queue.</span></div>
+              <button type="submit" class="primary-button" id="submit-button"><span>Start download</span><span aria-hidden="true">↗</span></button>
+              <p id="feedback" class="feedback" role="status" aria-live="polite"></p>
+            </form>
+          </div>
+
+          <div class="activity-column">
+            <div class="panel stat-panel"><div class="panel-heading panel-heading-small"><div><span class="eyebrow">02 / AT A GLANCE</span><h2>Overview</h2></div></div>
+              <div class="stat-grid"><div><span class="stat-label">TOTAL JOBS</span><strong id="stat-total">0</strong></div><div><span class="stat-label">PROCESSING</span><strong id="stat-active">0</strong></div><div><span class="stat-label">COMPLETE</span><strong id="stat-completed">0</strong></div><div><span class="stat-label">QUEUED</span><strong id="stat-queued">0</strong></div></div>
             </div>
+            <div class="quote-panel"><span class="quote-symbol">“</span><p>Tools should be powerful.<br><em>Experiences should be simple.</em></p><span class="quote-footer">THE MEDIADOCK PHILOSOPHY — 2026</span></div>
           </div>
+        </section>
 
-          <div class="field-group">
-            <label for="folder">Folder</label>
-            <div class="input-shell">
-              <span class="field-icon" data-lucide="folder"></span>
-              <input id="folder" type="text" placeholder="downloads/music" />
-            </div>
+        <section class="library" id="library" aria-labelledby="library-title">
+          <div class="library-top"><div><span class="eyebrow">03 / YOUR WORK</span><h2 id="library-title">Download <em>library.</em></h2><p>Live progress, completed files and recent activity in one place.</p></div><button type="button" class="refresh-button" id="refresh-button">↻ <span>Refresh</span></button></div>
+          <div class="library-controls" role="group" aria-label="Filter download jobs"><button class="job-filter active" type="button" data-state="all" aria-pressed="true">All jobs</button><button class="job-filter" type="button" data-state="running" aria-pressed="false">In progress</button><button class="job-filter" type="button" data-state="completed" aria-pressed="false">Completed</button><button class="job-filter" type="button" data-state="failed" aria-pressed="false">Failed / cancelled</button></div>
+          <div id="job-list" class="job-list" aria-live="polite" aria-relevant="additions removals">
+            <div class="empty-state"><div class="empty-icon" aria-hidden="true">↓</div><h3>Nothing here yet.</h3><p>Start your first download above, and your jobs will appear here.</p></div>
           </div>
-        </div>
+          <p class="library-hint">Completed files remain in the local <code>downloads/</code> folder until you remove their job. Only download media you have permission to save.</p>
+        </section>
 
-        <button id="downloadBtn" class="primary-action" type="submit">
-          <span data-lucide="download"></span>
-          <span>Download now</span>
-        </button>
-
-        <div class="status" id="status" role="status">
-          <span class="status-dot"></span>
-          <span>Ready to start.</span>
-        </div>
-      </form>
-    </section>
-  </main>
-
-  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
-  <script>
-    const urlInput = document.getElementById('url');
-    const typeSelect = document.getElementById('type');
-    const folderInput = document.getElementById('folder');
-    const statusEl = document.getElementById('status');
-    const button = document.getElementById('downloadBtn');
-    const themeToggleBtn = document.getElementById('themeToggleBtn');
-    const form = document.getElementById('downloadForm');
-
-    const renderIcons = () => {
-      if (window.lucide) {
-        window.lucide.createIcons({ attrs: { 'stroke-width': 1.8 } });
-      }
-    };
-
-    const setTheme = theme => {
-      document.documentElement.classList.toggle('light', theme === 'light');
-      document.body.classList.toggle('light', theme === 'light');
-      themeToggleBtn.innerHTML = `<span data-lucide="${theme === 'light' ? 'moon' : 'sun'}"></span>`;
-      themeToggleBtn.setAttribute('aria-label', theme === 'light' ? 'Enable dark theme' : 'Enable light theme');
-      localStorage.setItem('theme', theme);
-      renderIcons();
-    };
-
-    const savedTheme = localStorage.getItem('theme');
-    setTheme(savedTheme === 'light' ? 'light' : 'dark');
-
-    themeToggleBtn.addEventListener('click', () => {
-      const nextTheme = document.body.classList.contains('light') ? 'dark' : 'light';
-      setTheme(nextTheme);
-    });
-
-    form.addEventListener('submit', async event => {
-      event.preventDefault();
-
-      const url = urlInput.value.trim();
-      const type = typeSelect.value;
-      const folder = folderInput.value.trim();
-
-      if (!url) {
-        statusEl.innerHTML = '<span class="status-dot"></span><span>Enter a valid link before downloading.</span>';
-        statusEl.classList.add('error');
-        return;
-      }
-
-      statusEl.innerHTML = '<span class="status-dot"></span><span>Starting download...</span>';
-      statusEl.classList.remove('success', 'error');
-      button.disabled = true;
-
-      try {
-        const response = await fetch('/download', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url, type, folder })
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          statusEl.innerHTML = `<span class="status-dot"></span><span>Error: ${data.error || 'Server failure.'}</span>`;
-          statusEl.classList.add('error');
-          console.error(data.details || data);
-        } else {
-          statusEl.innerHTML = `<span class="status-dot"></span><span>${data.message}</span>`;
-          statusEl.classList.add('success');
-        }
-      } catch (error) {
-        statusEl.innerHTML = '<span class="status-dot"></span><span>Could not connect to the local server.</span>';
-        statusEl.classList.add('error');
-        console.error(error);
-      } finally {
-        button.disabled = false;
-      }
-    });
-
-    renderIcons();
-  </script>
+        <section class="about-section" id="about" aria-labelledby="about-title">
+          <div><span class="eyebrow">04 / ABOUT MEDIADOCK</span><h2 id="about-title">Made for makers.<br><em>Built for privacy.</em></h2></div>
+          <div><p>MediaDock is an open-source desktop companion with a local Node.js server. It delegates media processing to yt-dlp and FFmpeg, and keeps your queue and files under your own control.</p><a href="https://github.com/renegadothedev/web-site-dowloader-mp3" target="_blank" rel="noopener noreferrer">Explore the project on GitHub ↗</a></div>
+        </section>
+      </main>
+      <footer class="footer"><span>© <span id="year">2026</span> RENEGADOTHEDEV — MEDIADOCK</span><span>CRAFTED WITH INTENTION. <span class="footer-star">✳</span></span></footer>
+    </div>
+  </div>
+  <template id="job-template">
+    <article class="job-row">
+      <div class="job-icon" aria-hidden="true"></div>
+      <div class="job-main"><div class="job-meta"><span class="job-id"></span><span class="job-date"></span></div><h3 class="job-title"></h3><div class="job-subline"><span class="job-format"></span><span class="job-stage"></span></div><div class="progress-track" aria-hidden="true"><div class="progress-fill"></div></div><span class="job-percent"></span><div class="job-files"></div><p class="job-error" role="status"></p></div>
+      <div class="job-controls"><span class="job-state"></span><button type="button" class="job-cancel">Cancel</button><button type="button" class="job-remove">Remove</button></div>
+    </article>
+  </template>
 </body>
 </html>
