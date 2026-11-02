@@ -71,13 +71,6 @@ class DownloadQueue extends EventEmitter {
       throw new ClientError('The queue is full. Try again after a job finishes.', 429);
     }
     if (this.jobs.size >= this.maxJobs) {
-      // Evict only terminal jobs; never discard an active task.
-      for (const [id, job] of this.jobs) {
-        if (this.jobs.size < this.maxJobs) break;
-        if (TERMINAL.has(job.state)) this.jobs.delete(id);
-      }
-    }
-    if (this.jobs.size >= this.maxJobs) {
       throw new ClientError('Too many saved jobs. Remove old jobs and try again.', 429);
     }
     const id = randomUUID();
@@ -140,6 +133,10 @@ class DownloadQueue extends EventEmitter {
       job.stage = 'Failed';
       job.error = error?.publicMessage || 'Unable to download this media. Check the link and required tools.';
     } finally {
+      // Never keep partial downloads after a failed or cancelled attempt.
+      if (job.state !== 'completed') {
+        await fs.rm(job.dir, { recursive: true, force: true }).catch(() => {});
+      }
       this.publish(job);
     }
   }
@@ -161,6 +158,9 @@ class DownloadQueue extends EventEmitter {
     if (!job) throw new ClientError('Job not found.', 404);
     if (!TERMINAL.has(job.state)) {
       throw new ClientError('Cancel the active job before removing it.', 409);
+    }
+    if (job.controller) {
+      throw new ClientError('This worker is still stopping. Try again in a moment.', 409);
     }
     this.jobs.delete(id);
     this.pending = this.pending.filter(item => item !== id);
